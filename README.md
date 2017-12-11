@@ -4,14 +4,34 @@ The [Atlas of Living Australia], in collaboration with the [Australian Museum], 
 to harness the power of online volunteers (also known as crowdsourcing) to digitise biodiversity data that is locked up
 in biodiversity collections, field notebooks and survey sheets.
 
-##Running
+## Running
 
-The ansible inventories are currently out of date.  You can run DigiVol manually by using gradle to build:
+The ansible inventories are currently out of date.  You can run DigiVol manually by using gradle to build although these instructions don't describe how to get a CAS server running so you won't be able to start the app without that:
 
 ```bash
+export dv_pgpass=password
+docker run --name some-postgres -p 5432:5432 -e POSTGRES_PASSWORD=${dv_pgpass} -d postgres:9
+cd <this git repo>
+cat <<EOF > ./local.properties
+flywayUrl=jdbc:postgresql://localhost:5432/digivol
+flywayUsername=postgres
+flywayPassword=${dv_pgpass}
+EOF
+psql -U postgres -h localhost -W postgres -c "CREATE DATABASE digivol" # run `echo ${dv_pgpass}` to see password
 ./gradlew assemble
-java -jar build/libs/volunteer-portal-*.war
-open http://devt.ala.org.au:8080/
+mkdir -p /data/volunteer-portal/config/
+cat <<EOF > /data/volunteer-portal/config/volunteer-portal-config.properties
+dataSource.url=jdbc:postgresql://localhost:5432/digivol
+dataSource.username=postgres
+dataSource.password=${dv_pgpass}
+EOF
+# see https://github.com/AtlasOfLivingAustralia/ala-install/blob/master/ansible/roles/volunteer_portal/templates/config.properties for more config options
+java -jar build/libs/volunteer-portal-*exec.jar
+tail -n 30 logs/digivol.log # to see the CAS error
+open http://localhost:8080/ # if you got past the CAS server problems
+# to clean up
+docker rm -f some-postgres
+rm -r /data/volunteer*
 ```
 
 ~~To run up a vagrant instance of DigiVol you can use the volunteer_portal_instance ansible playbook from the
